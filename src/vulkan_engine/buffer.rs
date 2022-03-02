@@ -36,7 +36,7 @@ impl Buffer {
 	pub fn new(
 		device: &Device,
 		flags: vk::BufferCreateFlags,
-		mut size: u64,
+		size: u64,
 		usage: vk::BufferUsageFlags,
 		sharing_mode: vk::SharingMode,
 		allocation_type: UsageFlags,
@@ -45,9 +45,8 @@ impl Buffer {
 		if usage & vk::BufferUsageFlags::UNIFORM_BUFFER == vk::BufferUsageFlags::UNIFORM_BUFFER
 			&& size % 64 != 0
 		{
-			println!("Created an uniform buffer of size {} (may cause offset error) which is not multiple of 64, size was set to be {}.", size, size + size % 64);
-			size -= size % 64;
-			size += 64;
+			println!("Created an uniform buffer of size {} (may cause offset error) which is not multiple of 64, size should be {}.", size, size + 64 - (size % 64));
+			panic!();
 		}
 		let buffer_create_info = vk::BufferCreateInfo::builder()
 			.flags(flags)

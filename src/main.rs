@@ -458,7 +458,7 @@ fn main() {
 					emissive_intensity = pbr_param.emissive_intensity;
 
 					imgui::Window::new("Pbr parameters")
-						.size([300.0, 100.0], imgui::Condition::FirstUseEver)
+						.size([300.0, 150.0], imgui::Condition::FirstUseEver)
 						.build(&ui, || {
 							imgui::Slider::new("roughness", 0.0f32, 1.0f32)
 								.build(&ui, &mut pbr_param.roughness);
