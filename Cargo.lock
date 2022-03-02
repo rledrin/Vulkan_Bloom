@@ -23,18 +23,18 @@ dependencies = [
 
 [[package]]
 name = "ash"
-version = "0.35.2+1.2.203"
+version = "0.36.0+1.3.206"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f6a491bcad4563b355ac2bb6e3f09d5e1c5d628710c7156e901dad0c416075e"
+checksum = "ceea9c64653169f33f946debf0a41568afc4e23a4c37d29004a23b2ffbfb4034"
 dependencies = [
  "libloading 0.7.3",
 ]
 
 [[package]]
 name = "ash-window"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2f510c6da81963f828aaaf863983bc51f223fba4e8c3f054d98c941c7e19ee7"
+checksum = "ed540473cca5a9a40466521ec2fd0cfe5083173bf736a15a4580be523842ff93"
 dependencies = [
  "ash",
  "raw-window-handle 0.3.4",
@@ -415,9 +415,9 @@ dependencies = [
 
 [[package]]
 name = "gpu-alloc-ash"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c299de81e6adcc7f4ef15bf688a27fe18b8623555406c2da6ced6a95f57435b"
+checksum = "ce41a87dc3adcaa97c28bbee5e8c28d2b794a7955047ec50fd833550c31d23c4"
 dependencies = [
  "ash",
  "gpu-alloc-types",
@@ -452,9 +452,9 @@ dependencies = [
 
 [[package]]
 name = "imgui-rs-vulkan-renderer"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48d07b85ccc7882365ab3a593b2c65ea1e92ab9f106394a45dede3ffc45cb76b"
+checksum = "961dadb73412eac1f427354c27fb1058f6c7c6a72cfa33151087e318a1767b72"
 dependencies = [
  "ash",
  "imgui",

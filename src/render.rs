@@ -13,8 +13,8 @@ pub fn render_func(
 	index_buffer: &buffer::Buffer,
 	current_image_save: &mut usize,
 	index_count: u32,
-	_renderer: &mut imgui_rs_vulkan_renderer::Renderer,
-	_draw_data: &imgui::DrawData,
+	renderer: &mut imgui_rs_vulkan_renderer::Renderer,
+	draw_data: &imgui::DrawData,
 	bloom_images: &mut Vec<image::Image>,
 	bloom_data: &mut bloom::BloomConstant,
 ) {
@@ -57,6 +57,13 @@ pub fn render_func(
 		.clear_values(&clear_value)
 		.build();
 
+	let ui_render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+		.render_pass(engine.ui_renderpass.renderpass)
+		.framebuffer(engine.swapchain.swapchain_ui_framebuffers[current_image])
+		.render_area(render_area)
+		.clear_values(&clear_value)
+		.build();
+
 	let mut command_buffer = engine.command_builder.build();
 	unsafe {
 		engine.device.device.cmd_begin_render_pass(
@@ -95,10 +102,8 @@ pub fn render_func(
 			.device
 			.device
 			.cmd_draw_indexed(command_buffer, index_count, 1, 0, 0, 0);
-		// engine
-		// 	.device
-		// 	.device
-		// 	.cmd_draw(command_buffer, vertex_count, 1, 0, 0);
+
+		// renderer.cmd_draw(command_buffer, draw_data).expect("Failed to draw the ui.");
 
 		engine.device.device.cmd_end_render_pass(command_buffer);
 
@@ -113,6 +118,18 @@ pub fn render_func(
 		);
 
 		//BLOOM END
+
+		engine.device.device.cmd_begin_render_pass(
+			command_buffer,
+			&ui_render_pass_begin_info,
+			vk::SubpassContents::INLINE,
+		);
+
+		renderer
+			.cmd_draw(command_buffer, draw_data)
+			.expect("Failed to draw the ui.");
+
+		engine.device.device.cmd_end_render_pass(command_buffer);
 
 		engine
 			.device

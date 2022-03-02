@@ -60,6 +60,7 @@ pub struct VulkanEngine {
 	pub command_builder: command_buffer::CommandBufferBuilder,
 	pub swapchain: swapchain::Swapchain,
 	pub renderpass: renderpass::RenderPass,
+	pub ui_renderpass: renderpass::RenderPass,
 	pub surface: surface::Surface,
 	pub device: device::Device,
 	pub instance: instance::Instance,
@@ -233,6 +234,7 @@ impl VulkanEngine {
 
 	pub fn new() -> VulkanEngine {
 		let window = window::Window::new(1080, 720, "Bloom");
+		// let window = window::Window::new(1920, 1080, "Bloom");
 		let instance = instance::Instance::new(&window);
 		let device = device::Device::new(&instance);
 		let surface = surface::Surface::new(&instance, &window, &device);
@@ -286,6 +288,38 @@ impl VulkanEngine {
 			)
 			.build(&device);
 
+		let ui_renderpass = renderpass::RenderPass::builder()
+			.add_attachment(
+				surface.desired_format,
+				vk::SampleCountFlags::TYPE_1,
+				vk::AttachmentLoadOp::LOAD,
+				vk::AttachmentStoreOp::STORE,
+				vk::AttachmentLoadOp::DONT_CARE,
+				vk::AttachmentStoreOp::DONT_CARE,
+				vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+				vk::ImageLayout::PRESENT_SRC_KHR,
+			)
+			.add_subpasses(
+				vk::PipelineBindPoint::GRAPHICS,
+				vec![],
+				1,
+				None,
+				vec![],
+				vec![],
+			)
+			.add_dependencies(
+				vk::SUBPASS_EXTERNAL,
+				0,
+				vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+					| vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+				vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+					| vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+				vk::AccessFlags::empty(),
+				vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+				vk::DependencyFlags::empty(),
+			)
+			.build(&device);
+
 		let command_builder = command_buffer::CommandBufferBuilder::primary(
 			&device,
 			command_buffer::CommandBufferUsage::OneTimeSubmit,
@@ -310,6 +344,7 @@ impl VulkanEngine {
 			),
 			Some(depth_stencil_image),
 			&renderpass,
+			&ui_renderpass,
 		);
 
 		let descriptors = Vec::with_capacity(1);
@@ -340,6 +375,7 @@ impl VulkanEngine {
 			command_builder,
 			swapchain,
 			renderpass,
+			ui_renderpass,
 			surface,
 			device,
 			instance,
@@ -350,14 +386,11 @@ impl VulkanEngine {
 	pub fn window_resized(&mut self, current_image: &mut u32) {
 		*current_image = 0;
 		self.surface.surface_resolution = self.new_extent;
-		let depth_image = VulkanEngine::create_depth_image(
-			&self.instance,
-			&self.device,
-			&self.surface,
-		);
+		self.window.as_mut().unwrap().window_extent = self.new_extent;
+		let depth_image =
+			VulkanEngine::create_depth_image(&self.instance, &self.device, &self.surface);
 		unsafe {
-			self
-				.device
+			self.device
 				.device
 				.device_wait_idle()
 				.expect("Failed to wait for the device to be idle.");
@@ -365,6 +398,7 @@ impl VulkanEngine {
 		self.swapchain.recreate(
 			&self.surface,
 			&self.renderpass,
+			&self.ui_renderpass,
 			Some(depth_image),
 		);
 		let mut pipeline_vec = Vec::with_capacity(self.graphics_pipelines.len());

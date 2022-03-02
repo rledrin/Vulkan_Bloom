@@ -170,28 +170,29 @@ void main()
 	if (invocID.x <= imgSize.x && invocID.x <= imgSize.x) {
 
 		float combine_constant = 0.68;
+		float intensity = 1.0;
 
 		vec2 texCoords = vec2(float(invocID.x) / imgSize.x, float(invocID.y) / imgSize.y);
-		texCoords += (1.0f / imgSize) * 0.5f;
+		texCoords += (1.0f / imgSize) * 0.5;
 
 		vec2 texSize = vec2(textureSize(input_texture[input_index], int(lod)));
 		vec4 color = vec4(1, 0, 1, 1);
 
 		if (mode == MODE_PREFILTER)
 		{
-			color.rgb = DownsampleBox13(input_texture[input_index], lod, texCoords, 1.0f / texSize);
+			color.rgb = DownsampleBox13(input_texture[input_index], lod, texCoords, 1.0 / texSize);
 			color = Prefilter(color, texCoords);
-			color.a = 1.0f;
+			color.a = 1.0;
 		}
 		else if (mode == MODE_DOWNSAMPLE)
 		{
-			color.rgb = DownsampleBox13(input_texture[input_index], lod, texCoords, 1.0f / texSize);
+			color.rgb = DownsampleBox13(input_texture[input_index], lod, texCoords, 1.0 / texSize);
 		}
 		else if (mode == MODE_UPSAMPLE_FIRST)
 		{
 			vec2 bloomTexSize = vec2(textureSize(input_texture[input_index], int(lod + 1)));
-			float sampleScale = 1.0f;
-			vec3 upsampledTexture = UpsampleTent9(input_texture[input_index], lod + 1, texCoords, 1.0f / bloomTexSize, sampleScale);
+			float sampleScale = 1.0;
+			vec3 upsampledTexture = UpsampleTent9(input_texture[input_index], lod + 1, texCoords, 1.0 / bloomTexSize, sampleScale);
 
 			vec3 existing = textureLod(input_texture[input_index], texCoords, lod).rgb;
 			color = vec4(combine(existing, upsampledTexture, combine_constant), 1.0);
@@ -199,8 +200,8 @@ void main()
 		else if (mode == MODE_UPSAMPLE)
 		{
 			vec2 bloomTexSize = vec2(textureSize(bloom_texture[bloom_index], int(lod + 1)));
-			float sampleScale = 1.0f;
-			vec3 upsampledTexture = UpsampleTent9(bloom_texture[bloom_index], lod + 1, texCoords, 1.0f / bloomTexSize, sampleScale);
+			float sampleScale = 1.0;
+			vec3 upsampledTexture = UpsampleTent9(bloom_texture[bloom_index], lod + 1, texCoords, 1.0 / bloomTexSize, sampleScale);
 
 			vec3 existing = textureLod(input_texture[input_index], texCoords, lod).rgb;
 			color = vec4(combine(existing, upsampledTexture, combine_constant), 1.0);
@@ -213,8 +214,7 @@ void main()
 
 			vec3 existing = textureLod(input_texture[input_index], texCoords, 0).rgb;
 
-
-			vec3 combined_color = combine(existing, upsampledTexture, combine_constant);
+			vec3 combined_color = combine(existing, upsampledTexture * intensity, combine_constant);
 	
 			vec3 mapped_color = GTTonemap(combined_color);
 
@@ -225,37 +225,3 @@ void main()
 		imageStore(output_image[output_index], invocID, color);
 	}
 }
-
-// #version 450
-
-// layout(set = 1, binding = 0, std140) uniform _41_43
-// {
-//     vec4 _m0;
-// } Param;
-
-// Param._m0.x = 0.68;
-// Param._m0.y = 65472.00;
-// Param._m0.z = 1.00;
-// Param._m0.w = 0.50;
-
-
-// layout(set = 0, binding = 2) uniform texture2D existing_texture;
-// layout(set = 0, binding = 0) uniform mediump sampler image_sampler;
-// layout(set = 0, binding = 1) uniform texture2D bloom_texture;
-
-// layout(location = 0) in vec2 uv;
-// layout(location = 0) out vec4 final_color;
-// vec3 existing_color;
-// vec3 bloom_color;
-
-// void main()
-// {
-//     existing_color = texture(sampler2D(existing_texture, image_sampler), uv).xyz;
-//     bloom_color = texture(sampler2D(bloom_texture, image_sampler), uv).xyz;
-//     existing_color += (-bloom_color);
-//     vec3 blended_color = (Param._m0.xxx * existing_color) + bloom_color;
-//     final_color = vec4(blended_color.x, blended_color.y, blended_color.z, final_color.w);
-//     final_color.w = 1.0;
-// }
-
-

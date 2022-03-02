@@ -33,7 +33,7 @@ fn main() {
 	let pv = proj * view;
 	let model = uv::Mat4::from_scale(1.0f32);
 
-	let pbr_param = vulkan_engine::PbrParameters {
+	let mut pbr_param = vulkan_engine::PbrParameters {
 		albedo: uv::Vec3::new(1.0, 0.0, 0.0),
 		metallic: 0.0,
 		roughness: 0.2,
@@ -342,7 +342,7 @@ fn main() {
 		(*engine.device.device).clone(),
 		engine.device.graphic_queue,
 		engine.command_builder.command_pool.command_pool,
-		engine.renderpass.renderpass,
+		engine.ui_renderpass.renderpass,
 		&mut imgui,
 		Some(imgui_rs_vulkan_renderer::Options {
 			in_flight_frames: 1,
@@ -359,9 +359,8 @@ fn main() {
 		imgui_winit_support::HiDpiMode::Default,
 	);
 
-	// let mut albedo_color = [0.0f32; 3];
-	// let mut emissive_color = [0.0f32; 3];
-
+	let mut albedo_color = [0.0f32; 3];
+	let mut emissive_color = [0.0f32; 3];
 
 	let mut current_image = 0;
 	let mut window: window::Window = unsafe { std::mem::transmute_copy(&engine.window) };
@@ -389,15 +388,25 @@ fn main() {
 				winit::event::WindowEvent::Resized(logical_size) => {
 					// println!("new size: {:?}", logical_size);
 					if logical_size.width != 0 && logical_size.height != 0 {
-						engine.new_extent = vk::Extent2D::builder().width(logical_size.width).height(logical_size.height).build();
+						engine.new_extent = vk::Extent2D::builder()
+							.width(logical_size.width)
+							.height(logical_size.height)
+							.build();
 						engine.resized = true;
 						engine.minimized = false;
 					} else if logical_size.width == 0 && logical_size.height == 0 {
 						engine.minimized = true;
-					} else if engine.minimized == true && logical_size.width != 0 && logical_size.height != 0 {
+					} else if engine.minimized == true
+						&& logical_size.width != 0
+						&& logical_size.height != 0
+					{
 						engine.minimized = false;
 					}
-
+					platform.handle_event::<winit::event::Event<()>>(
+						imgui.io_mut(),
+						&engine.window.as_ref().unwrap().window,
+						&winit::event::Event::WindowEvent { event, window_id },
+					);
 				}
 				_ => {
 					platform.handle_event::<winit::event::Event<()>>(
@@ -419,7 +428,6 @@ fn main() {
 				} else if engine.resized == true && engine.old_extent != engine.new_extent {
 					engine.old_extent = engine.new_extent;
 				}
-
 			}
 			winit::event::Event::MainEventsCleared => {
 				platform
@@ -432,40 +440,44 @@ fn main() {
 					let ui = imgui.frame();
 					// let mut opened = true;
 
-					// // ui.show_demo_window(&mut opened);
-					// albedo_color[0] = pbr_param.albedo.x;
-					// albedo_color[1] = pbr_param.albedo.y;
-					// albedo_color[2] = pbr_param.albedo.z;
+					// ui.show_demo_window(&mut opened);
+					albedo_color[0] = pbr_param.albedo.x;
+					albedo_color[1] = pbr_param.albedo.y;
+					albedo_color[2] = pbr_param.albedo.z;
 
-					// imgui::Window::new("Pbr parameters")
-					// 	.size([300.0, 100.0], imgui::Condition::FirstUseEver)
-					// 	.build(&ui, || {
-					// 		imgui::Slider::new("roughness", 0.0f32, 1.0f32)
-					// 			.build(&ui, &mut pbr_param.roughness);
-					// 		imgui::Slider::new("metallic", 0.0f32, 1.0f32)
-					// 			.build(&ui, &mut pbr_param.metallic);
-					// 		imgui::Slider::new("ao", 0.0f32, 1.0f32).build(&ui, &mut pbr_param.ao);
-					// 		imgui::ColorEdit::new(
-					// 			"albedo",
-					// 			imgui::EditableColor::Float3(&mut albedo_color),
-					// 		)
-					// 		.build(&ui);
-					// 		imgui::ColorEdit::new(
-					// 			"emissive",
-					// 			imgui::EditableColor::Float3(&mut emissive_color),
-					// 		)
-					// 		.build(&ui);
-					// 		// imgui::Slider::new("emissive intensity", 0.0f32, 100.0f32).build(&ui, &mut val);
-					// 	})
-					// 	.expect("Failed to create the ui");
+					imgui::Window::new("Pbr parameters")
+						.size([300.0, 100.0], imgui::Condition::FirstUseEver)
+						.build(&ui, || {
+							imgui::Slider::new("roughness", 0.0f32, 1.0f32)
+								.build(&ui, &mut pbr_param.roughness);
+							imgui::Slider::new("metallic", 0.0f32, 1.0f32)
+								.build(&ui, &mut pbr_param.metallic);
+							imgui::Slider::new("ao", 0.0f32, 1.0f32).build(&ui, &mut pbr_param.ao);
+							imgui::ColorEdit::new(
+								"albedo",
+								imgui::EditableColor::Float3(&mut albedo_color),
+							)
+							.build(&ui);
+							imgui::ColorEdit::new(
+								"emissive",
+								imgui::EditableColor::Float3(&mut emissive_color),
+							)
+							.build(&ui);
+							// imgui::Textures::new().
+							// imgui::Slider::new("emissive intensity", 0.0f32, 100.0f32).build(&ui, &mut val);
+						})
+						.expect("Failed to create the ui");
 
-					// pbr_param.albedo.x = albedo_color[0];
-					// pbr_param.albedo.y = albedo_color[1];
-					// pbr_param.albedo.z = albedo_color[2];
+					pbr_param.albedo.x = albedo_color[0];
+					pbr_param.albedo.y = albedo_color[1];
+					pbr_param.albedo.z = albedo_color[2];
 
-					// uniform_buffer.write(std::mem::size_of::<uv::Mat4>() as u64, &vec![pbr_param]);
+					uniform_buffer.write(
+						(size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>()) as u64,
+						vec![pbr_param],
+					);
 
-					// platform.prepare_render(&ui, &engine.window.as_ref().unwrap().window);
+					platform.prepare_render(&ui, &engine.window.as_ref().unwrap().window);
 					let draw_data = ui.render();
 					let mut tmp_current_image = current_image as usize;
 					render::render_func(
@@ -480,8 +492,7 @@ fn main() {
 						&mut bloom_data,
 					);
 					current_image = tmp_current_image as u32;
-				}
-				else if engine.minimized == true {
+				} else if engine.minimized == true {
 					std::thread::sleep(std::time::Duration::from_millis(10));
 				}
 			}
@@ -493,7 +504,6 @@ fn main() {
 					&event,
 				);
 			}
-			
 		}
 	});
 }

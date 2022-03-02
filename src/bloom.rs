@@ -283,7 +283,7 @@ pub fn bloom(
 		.src_queue_family_index(engine.device.queue_family_index)
 		.dst_queue_family_index(engine.device.queue_family_index)
 		.old_layout(vk::ImageLayout::GENERAL)
-		.new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+		.new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
 		.build();
 
 	unsafe {

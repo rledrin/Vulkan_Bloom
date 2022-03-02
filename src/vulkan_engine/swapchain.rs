@@ -18,6 +18,7 @@ pub struct Swapchain {
 	pub swapchain_image_sampler: vk::Sampler,
 	pub depth_stencil_image: Option<Image>,
 	pub swapchain_framebuffers: Vec<vk::Framebuffer>,
+	pub swapchain_ui_framebuffers: Vec<vk::Framebuffer>,
 	pub max_image_in_flight: usize,
 	swapchain_create_info: vk::SwapchainCreateInfoKHR,
 	device: Arc<ash::Device>,
@@ -33,6 +34,8 @@ impl Drop for Swapchain {
 					.destroy_image_view(self.swapchain_image_views[i], None);
 				self.device
 					.destroy_framebuffer(self.swapchain_framebuffers[i], None);
+				self.device
+					.destroy_framebuffer(self.swapchain_ui_framebuffers[i], None);
 			}
 			self.swapchain_loader
 				.destroy_swapchain(self.swapchain, None);
@@ -59,6 +62,7 @@ impl Swapchain {
 		image_usage: Option<vk::ImageUsageFlags>,
 		depth_stencil_image: Option<Image>,
 		renderpass: &RenderPass,
+		ui_renderpass: &RenderPass,
 	) -> Swapchain {
 		let present_modes = unsafe {
 			surface
@@ -145,6 +149,7 @@ impl Swapchain {
 
 		let mut swapchain_image_views = Vec::with_capacity(swapchain_images.len());
 		let mut swapchain_framebuffers = Vec::with_capacity(swapchain_images.len());
+		let mut swapchain_ui_framebuffers = Vec::with_capacity(swapchain_images.len());
 		for &image in swapchain_images.iter() {
 			let image_view_create_info = vk::ImageViewCreateInfo::builder()
 				.view_type(vk::ImageViewType::TYPE_2D)
@@ -184,14 +189,31 @@ impl Swapchain {
 				.layers(1)
 				.build();
 
+			let ui_framebuffer_create_info = vk::FramebufferCreateInfo::builder()
+				.flags(vk::FramebufferCreateFlags::empty())
+				.render_pass(ui_renderpass.renderpass)
+				.attachments(&[imageview])
+				.width(surface.surface_resolution.width)
+				.height(surface.surface_resolution.height)
+				.layers(1)
+				.build();
+
 			let framebuffer = unsafe {
 				device
 					.device
 					.create_framebuffer(&framebuffer_create_info, None)
 					.expect("Failed to create a framebuffer.")
 			};
+
+			let ui_framebuffer = unsafe {
+				device
+					.device
+					.create_framebuffer(&ui_framebuffer_create_info, None)
+					.expect("Failed to create a framebuffer.")
+			};
 			swapchain_image_views.push(imageview);
 			swapchain_framebuffers.push(framebuffer);
+			swapchain_ui_framebuffers.push(ui_framebuffer);
 		}
 
 		let swapchain_extent = surface.surface_resolution;
@@ -207,6 +229,7 @@ impl Swapchain {
 			swapchain_image_sampler,
 			depth_stencil_image,
 			swapchain_framebuffers,
+			swapchain_ui_framebuffers,
 			max_image_in_flight,
 			swapchain_create_info,
 			device: device.device.clone(),
@@ -217,6 +240,7 @@ impl Swapchain {
 		&mut self,
 		surface: &surface::Surface,
 		renderpass: &renderpass::RenderPass,
+		ui_renderpass: &renderpass::RenderPass,
 		depth_image: Option<image::Image>,
 	) {
 		unsafe {
@@ -228,11 +252,14 @@ impl Swapchain {
 					.destroy_image_view(self.swapchain_image_views[i], None);
 				self.device
 					.destroy_framebuffer(self.swapchain_framebuffers[i], None);
+				self.device
+					.destroy_framebuffer(self.swapchain_ui_framebuffers[i], None);
 			}
 			self.swapchain_loader
 				.destroy_swapchain(self.swapchain, None);
 		}
 		self.swapchain_framebuffers.clear();
+		self.swapchain_ui_framebuffers.clear();
 		self.swapchain_image_views.clear();
 
 		self.swapchain_create_info.image_extent = surface.surface_resolution;
@@ -267,12 +294,10 @@ impl Swapchain {
 			.build();
 
 		self.swapchain_image_sampler = unsafe {
-			self
-				.device
+			self.device
 				.create_sampler(&sampler_create_info, None)
 				.expect("Failed to create an image sampler(swapchain).")
 		};
-
 
 		let mut attachments = Vec::with_capacity(2);
 		if self.depth_stencil_image.is_some() {
@@ -323,13 +348,28 @@ impl Swapchain {
 				.layers(1)
 				.build();
 
+			let ui_framebuffer_create_info = vk::FramebufferCreateInfo::builder()
+				.flags(vk::FramebufferCreateFlags::empty())
+				.render_pass(ui_renderpass.renderpass)
+				.attachments(&[imageview])
+				.width(surface.surface_resolution.width)
+				.height(surface.surface_resolution.height)
+				.layers(1)
+				.build();
+
 			let framebuffer = unsafe {
 				self.device
 					.create_framebuffer(&framebuffer_create_info, None)
 					.expect("Failed to create a framebuffer.")
 			};
+			let ui_framebuffer = unsafe {
+				self.device
+					.create_framebuffer(&ui_framebuffer_create_info, None)
+					.expect("Failed to create a framebuffer.")
+			};
 			self.swapchain_image_views.push(imageview);
 			self.swapchain_framebuffers.push(framebuffer);
+			self.swapchain_ui_framebuffers.push(ui_framebuffer);
 		}
 		self.swapchain_extent = surface.surface_resolution;
 	}

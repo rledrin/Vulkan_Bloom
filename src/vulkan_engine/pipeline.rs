@@ -33,7 +33,7 @@ impl GraphicsPipeline {
 		}
 	}
 
-	pub fn recreate(mut self, device: &Device, extent: vk::Extent2D) -> GraphicsPipeline{
+	pub fn recreate(mut self, device: &Device, extent: vk::Extent2D) -> GraphicsPipeline {
 		let viewport = vk::Viewport::builder()
 			.width(extent.width as f32)
 			.height(extent.height as f32)
@@ -41,7 +41,12 @@ impl GraphicsPipeline {
 			.max_depth(1.0)
 			.build();
 		let scissor = vk::Rect2D::builder()
-			.extent(vk::Extent2D::builder().width(extent.width).height(extent.height).build())
+			.extent(
+				vk::Extent2D::builder()
+					.width(extent.width)
+					.height(extent.height)
+					.build(),
+			)
 			.build();
 
 		self.builder.as_mut().unwrap().viewports[0] = viewport;
@@ -335,7 +340,7 @@ impl GraphicsPipelineBuilder {
 					.name(vertex_module.entry_point.as_c_str())
 					.stage(vk::ShaderStageFlags::VERTEX)
 					.flags(vk::PipelineShaderStageCreateFlags::empty())
-					.build()
+					.build(),
 			);
 		}
 		if self.fragment_module.is_some() {
@@ -346,7 +351,7 @@ impl GraphicsPipelineBuilder {
 					.name(fragment_module.entry_point.as_c_str())
 					.stage(vk::ShaderStageFlags::FRAGMENT)
 					.flags(vk::PipelineShaderStageCreateFlags::empty())
-					.build()
+					.build(),
 			);
 		}
 

@@ -17,21 +17,14 @@ layout(set = 0, binding = 1) uniform model_matrix {
 	mat4 model;
 } model;
 
-
-// layout( push_constant ) uniform matrix {
-// 	mat4 model;
-// } PushConstant;
-
 void main()
 {
 	vec4 model_position = model.model * vec4(inPosition, 1.0);
 
 	vec4 final_position = view_proj.vp * model_position;
 
-
 	outWorldPos = vec3(model_position);
 	outNormal = mat3(model.model) * inNormal;
-	// outNormal = inNormal;
 	outUv = inUv;
 
 	gl_Position = final_position;
