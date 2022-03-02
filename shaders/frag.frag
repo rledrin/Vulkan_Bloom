@@ -19,6 +19,8 @@ layout(set = 1, binding = 0) uniform PbrParameters{
 	float roughness;
 	float ao;
 	vec3 cam_pos;
+	vec3 emissive_color;
+	float emissive_intensity;
 	Light lights[1];
 } parameters;
 
@@ -146,16 +148,11 @@ void main()
 	vec3 ambient = vec3(0.03) * parameters.albedo * parameters.ao;
 	vec3 color = ambient + Lo;
 
-	// color = color / (color + vec3(1.0));
-	// color = pow(color, vec3(1.0/2.2));
 	// vec3 tone_mapped_color = color;
 
-	// vec3 tone_mapped_color = color * 3;
-
-	// // vec3 tone_mapped_color = aces(color);
+	// vec3 tone_mapped_color = aces(color);
 	// vec3 tone_mapped_color = GTTonemap(color);
-	// // tone_mapped_color = pow(tone_mapped_color, vec3(1.0/2.2));
+	// tone_mapped_color = pow(tone_mapped_color, vec3(1.0/2.2));
 
-	// outColor = vec4(color, 1.0);
-	outColor = vec4(5.5, 4.62, 1.014, 1.0);
+	outColor = vec4(color + (parameters.emissive_color * parameters.emissive_intensity), 1.0);
 }

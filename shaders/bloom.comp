@@ -12,6 +12,8 @@ layout(set = 0, binding = 2) uniform sampler2D bloom_texture[4];
 
 layout(set = 0, binding = 3) uniform parameters {
 	vec4 params; // (x) threshold, (y) threshold - knee, (z) knee * 2, (w) 0.25 / knee
+	float intensity;
+	float combine_constant;
 } bloom_param;
 
 const float Epsilon = 1.0e-4;
@@ -169,8 +171,8 @@ void main()
 	ivec2 invocID = ivec2(gl_GlobalInvocationID);
 	if (invocID.x <= imgSize.x && invocID.x <= imgSize.x) {
 
-		float combine_constant = 0.68;
-		float intensity = 1.0;
+		// float combine_constant = 0.68;
+		// float intensity = 1.0;
 
 		vec2 texCoords = vec2(float(invocID.x) / imgSize.x, float(invocID.y) / imgSize.y);
 		texCoords += (1.0f / imgSize) * 0.5;
@@ -195,7 +197,7 @@ void main()
 			vec3 upsampledTexture = UpsampleTent9(input_texture[input_index], lod + 1, texCoords, 1.0 / bloomTexSize, sampleScale);
 
 			vec3 existing = textureLod(input_texture[input_index], texCoords, lod).rgb;
-			color = vec4(combine(existing, upsampledTexture, combine_constant), 1.0);
+			color = vec4(combine(existing, upsampledTexture, bloom_param.combine_constant), 1.0);
 		}
 		else if (mode == MODE_UPSAMPLE)
 		{
@@ -204,7 +206,7 @@ void main()
 			vec3 upsampledTexture = UpsampleTent9(bloom_texture[bloom_index], lod + 1, texCoords, 1.0 / bloomTexSize, sampleScale);
 
 			vec3 existing = textureLod(input_texture[input_index], texCoords, lod).rgb;
-			color = vec4(combine(existing, upsampledTexture, combine_constant), 1.0);
+			color = vec4(combine(existing, upsampledTexture, bloom_param.combine_constant), 1.0);
 		}
 		else if (mode == MODE_APPLY)
 		{
@@ -214,7 +216,7 @@ void main()
 
 			vec3 existing = textureLod(input_texture[input_index], texCoords, 0).rgb;
 
-			vec3 combined_color = combine(existing, upsampledTexture * intensity, combine_constant);
+			vec3 combined_color = combine(existing, upsampledTexture * bloom_param.intensity, bloom_param.combine_constant);
 	
 			vec3 mapped_color = GTTonemap(combined_color);
 

@@ -39,6 +39,8 @@ fn main() {
 		roughness: 0.2,
 		ao: 0.01,
 		cam_pos: uv::Vec3::new(0.0, 0.0, -8.0),
+		emissive_color: uv::Vec3::new(0.0, 0.0, 0.0),
+		emissive_intensity: 0.0,
 		lights: [vulkan_engine::Light {
 			light_position: uv::Vec3::new(-4.0, 5.0, -5.0),
 			light_color: uv::Vec3::new(5.0, 5.0, 5.0),
@@ -48,7 +50,7 @@ fn main() {
 	};
 
 	let u_buffer_size = buffer::aligne_offset(size_of::<uv::Mat4>() as u64) * 2
-		+ buffer::aligne_offset(size_of::<uv::Vec4>() as u64)
+		+ buffer::aligne_offset((size_of::<uv::Vec4>() * 2) as u64)
 		+ buffer::aligne_offset(size_of::<vulkan_engine::PbrParameters>() as u64);
 
 	let mut uniform_buffer = buffer::Buffer::new(
@@ -66,7 +68,7 @@ fn main() {
 	uniform_buffer.write(0, vec![pv]);
 	uniform_buffer.write(size_of::<uv::Mat4>() as u64, vec![model]);
 	uniform_buffer.write(
-		buffer::aligne_offset((size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>()) as u64),
+		buffer::aligne_offset((size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>() * 2) as u64),
 		vec![pbr_param],
 	);
 
@@ -125,7 +127,7 @@ fn main() {
 		Some(vec![vk::DescriptorBufferInfo::builder()
 			.buffer(*uniform_buffer.buffer)
 			.offset(buffer::aligne_offset(
-				(size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>()) as u64,
+				(size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>() * 2) as u64,
 			))
 			.range(size_of::<vulkan_engine::PbrParameters>() as u64)
 			.build()]),
@@ -287,17 +289,20 @@ fn main() {
 		],
 	);
 
-	let bloom_threshold = 1.0f32;
-	let bloom_knee = 0.2f32;
+	let mut bloom_threshold = 1.0f32;
+	let mut bloom_knee = 0.2f32;
 
 	uniform_buffer.write(
 		(size_of::<uv::Mat4>() * 2) as u64,
-		vec![uv::Vec4::new(
-			bloom_threshold,
-			bloom_threshold - bloom_knee,
-			bloom_knee * 2.0f32,
-			0.25f32 / bloom_knee,
-		)],
+		vec![
+			uv::Vec4::new(
+				bloom_threshold,
+				bloom_threshold - bloom_knee,
+				bloom_knee * 2.0f32,
+				0.25f32 / bloom_knee,
+			),
+			uv::Vec4::new(1.0f32, 0.68f32, 0.0f32, 0.0f32),
+		],
 	);
 
 	image_descriptor.update_descriptor_set(
@@ -306,7 +311,7 @@ fn main() {
 		Some(vec![vk::DescriptorBufferInfo::builder()
 			.buffer(*uniform_buffer.buffer)
 			.offset((size_of::<uv::Mat4>() * 2) as u64)
-			.range(size_of::<uv::Vec4>() as u64)
+			.range((size_of::<uv::Vec4>() * 2) as u64)
 			.build()]),
 		None,
 	);
@@ -361,6 +366,9 @@ fn main() {
 
 	let mut albedo_color = [0.0f32; 3];
 	let mut emissive_color = [0.0f32; 3];
+	let mut emissive_intensity = 1.0;
+	let mut bloom_intensity = 1.0;
+	let mut combine_constant = 0.68;
 
 	let mut current_image = 0;
 	let mut window: window::Window = unsafe { std::mem::transmute_copy(&engine.window) };
@@ -444,6 +452,10 @@ fn main() {
 					albedo_color[0] = pbr_param.albedo.x;
 					albedo_color[1] = pbr_param.albedo.y;
 					albedo_color[2] = pbr_param.albedo.z;
+					emissive_color[0] = pbr_param.emissive_color.x;
+					emissive_color[1] = pbr_param.emissive_color.y;
+					emissive_color[2] = pbr_param.emissive_color.z;
+					emissive_intensity = pbr_param.emissive_intensity;
 
 					imgui::Window::new("Pbr parameters")
 						.size([300.0, 100.0], imgui::Condition::FirstUseEver)
@@ -463,18 +475,49 @@ fn main() {
 								imgui::EditableColor::Float3(&mut emissive_color),
 							)
 							.build(&ui);
-							// imgui::Textures::new().
-							// imgui::Slider::new("emissive intensity", 0.0f32, 100.0f32).build(&ui, &mut val);
+							imgui::Slider::new("emissive intensity", 0.0f32, 20.0f32)
+								.build(&ui, &mut emissive_intensity);
+							imgui::Slider::new("bloom intensity", 0.0f32, 100.0f32)
+								.build(&ui, &mut bloom_intensity);
+							imgui::Slider::new("combine constant", 0.001f32, 1.0f32)
+								.build(&ui, &mut combine_constant);
+							imgui::Slider::new("bloom threshold", 0.0f32, 5.0f32)
+								.build(&ui, &mut bloom_threshold);
+							imgui::Slider::new("bloom knee", 0.0f32, 5.0f32)
+								.build(&ui, &mut bloom_knee);
 						})
 						.expect("Failed to create the ui");
-
 					pbr_param.albedo.x = albedo_color[0];
 					pbr_param.albedo.y = albedo_color[1];
 					pbr_param.albedo.z = albedo_color[2];
+					pbr_param.emissive_color.x = emissive_color[0];
+					pbr_param.emissive_color.y = emissive_color[1];
+					pbr_param.emissive_color.z = emissive_color[2];
+					pbr_param.emissive_intensity = emissive_intensity;
 
 					uniform_buffer.write(
-						(size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>()) as u64,
+						buffer::aligne_offset(
+							(size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>() * 2) as u64,
+						),
 						vec![pbr_param],
+					);
+					uniform_buffer.write(
+						(size_of::<uv::Mat4>() * 2) as u64,
+						vec![uv::Vec4::new(
+							bloom_threshold,
+							bloom_threshold - bloom_knee,
+							bloom_knee * 2.0f32,
+							0.25f32 / bloom_knee,
+						)],
+					);
+					uniform_buffer.write(
+						(size_of::<uv::Mat4>() * 2 + size_of::<uv::Vec4>()) as u64,
+						vec![uv::Vec4::new(
+							bloom_intensity * 2.0,
+							combine_constant,
+							0.0,
+							0.0,
+						)],
 					);
 
 					platform.prepare_render(&ui, &engine.window.as_ref().unwrap().window);

@@ -45,6 +45,8 @@ pub struct PbrParameters {
 	pub padding_2: [u32; 2],
 	pub cam_pos: uv::Vec3,
 	pub padding_3: u32,
+	pub emissive_color: uv::Vec3,
+	pub emissive_intensity: f32,
 	pub lights: [Light; 1],
 }
 
