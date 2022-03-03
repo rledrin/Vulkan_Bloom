@@ -53,7 +53,7 @@ fn update_descriptor(
 	input_image_descr_info.push(
 		vk::DescriptorImageInfo::builder()
 			.image_layout(vk::ImageLayout::GENERAL)
-			.image_view(engine.swapchain.swapchain_image_views[current_image])
+			.image_view(engine.swapchain.swapchain_hdr_images[current_image].image_view)
 			.sampler(engine.swapchain.swapchain_image_sampler)
 			.build(),
 	);
@@ -116,30 +116,40 @@ pub fn bloom(
 		vec![bloom_data.clone()],
 	);
 
-	update_descriptor(engine, current_image, bloom_images);
-
 	let subresource_range = vk::ImageSubresourceRange::builder()
 		.aspect_mask(vk::ImageAspectFlags::COLOR)
 		.layer_count(1)
 		.level_count(1)
 		.build();
-	let image_memory_barrier = vk::ImageMemoryBarrier::builder()
-		.src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-		.dst_access_mask(vk::AccessFlags::MEMORY_WRITE | vk::AccessFlags::MEMORY_READ)
-		.subresource_range(subresource_range)
-		.image(engine.swapchain.swapchain_images[current_image])
-		.src_queue_family_index(engine.device.queue_family_index)
-		.dst_queue_family_index(engine.device.queue_family_index)
-		.old_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-		.new_layout(vk::ImageLayout::GENERAL)
-		.build();
+	let image_memory_barrier = [
+		vk::ImageMemoryBarrier::builder()
+			.src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+			.dst_access_mask(vk::AccessFlags::MEMORY_WRITE | vk::AccessFlags::MEMORY_READ)
+			.subresource_range(subresource_range)
+			.image(engine.swapchain.swapchain_hdr_images[current_image].image)
+			.src_queue_family_index(engine.device.queue_family_index)
+			.dst_queue_family_index(engine.device.queue_family_index)
+			.old_layout(vk::ImageLayout::GENERAL)
+			.new_layout(vk::ImageLayout::GENERAL)
+			.build(),
+		vk::ImageMemoryBarrier::builder()
+			.src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+			.dst_access_mask(vk::AccessFlags::MEMORY_WRITE | vk::AccessFlags::MEMORY_READ)
+			.subresource_range(subresource_range)
+			.image(engine.swapchain.swapchain_images[current_image])
+			.src_queue_family_index(engine.device.queue_family_index)
+			.dst_queue_family_index(engine.device.queue_family_index)
+			.old_layout(vk::ImageLayout::UNDEFINED)
+			.new_layout(vk::ImageLayout::GENERAL)
+			.build()
+		];
 
 	let memory_barrier = vk::MemoryBarrier::builder()
 		.dst_access_mask(vk::AccessFlags::MEMORY_WRITE)
 		.src_access_mask(vk::AccessFlags::MEMORY_READ)
 		.build();
 
-	// sync graphic --> compute + change layout
+	// sync graphic --> compute
 	unsafe {
 		engine.device.device.cmd_pipeline_barrier(
 			*command_buffer,
@@ -148,9 +158,11 @@ pub fn bloom(
 			vk::DependencyFlags::empty(),
 			&[],
 			&[],
-			&[image_memory_barrier],
+			&image_memory_barrier,
 		);
 	};
+
+	update_descriptor(engine, current_image, bloom_images);
 
 	//preFilter
 	bloom_data.mode_lod_in_out_bloom = MODE_PREFILTER << 28 | 0 << 21 | 3 << 14 | 0 << 7 | 0;
@@ -282,7 +294,7 @@ pub fn bloom(
 		.image(engine.swapchain.swapchain_images[current_image])
 		.src_queue_family_index(engine.device.queue_family_index)
 		.dst_queue_family_index(engine.device.queue_family_index)
-		.old_layout(vk::ImageLayout::GENERAL)
+		.old_layout(vk::ImageLayout::UNDEFINED)
 		.new_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
 		.build();
 

@@ -43,7 +43,7 @@ fn main() {
 		emissive_intensity: 0.0,
 		lights: [vulkan_engine::Light {
 			light_position: uv::Vec3::new(-4.0, 5.0, -5.0),
-			light_color: uv::Vec3::new(5.0, 5.0, 5.0),
+			light_color: uv::Vec3::new(25.0, 25.0, 25.0),
 			..Default::default()
 		}],
 		..Default::default()
@@ -215,7 +215,7 @@ fn main() {
 			&engine.device,
 			vk::ImageCreateFlags::empty(),
 			vk::ImageType::TYPE_2D,
-			engine.surface.desired_format,
+			vk::Format::R16G16B16A16_SFLOAT,
 			vk::Extent3D::builder()
 				.width(image_width)
 				.height(image_height)
@@ -347,7 +347,7 @@ fn main() {
 		(*engine.device.device).clone(),
 		engine.device.graphic_queue,
 		engine.command_builder.command_pool.command_pool,
-		engine.ui_renderpass.renderpass,
+		engine.renderpass.renderpass,
 		&mut imgui,
 		Some(imgui_rs_vulkan_renderer::Options {
 			in_flight_frames: 1,
@@ -479,11 +479,11 @@ fn main() {
 								.build(&ui, &mut emissive_intensity);
 							imgui::Slider::new("bloom intensity", 0.0f32, 100.0f32)
 								.build(&ui, &mut bloom_intensity);
-							imgui::Slider::new("combine constant", 0.001f32, 1.0f32)
+							imgui::Slider::new("combine constant", 0.005f32, 1.0f32)
 								.build(&ui, &mut combine_constant);
-							imgui::Slider::new("bloom threshold", 0.0f32, 5.0f32)
+							imgui::Slider::new("bloom threshold", 0.0f32, 50.0f32)
 								.build(&ui, &mut bloom_threshold);
-							imgui::Slider::new("bloom knee", 0.0f32, 5.0f32)
+							imgui::Slider::new("bloom knee", 0.0f32, 50.0f32)
 								.build(&ui, &mut bloom_knee);
 						})
 						.expect("Failed to create the ui");

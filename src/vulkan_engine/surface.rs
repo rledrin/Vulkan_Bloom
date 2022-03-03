@@ -68,9 +68,9 @@ impl Surface {
 			surface_capabilities.current_transform
 		};
 
-		// let desired_format = surface_format.format;
+		let desired_format = surface_format.format;
 		// let desired_format = vk::Format::A2B10G10R10_UNORM_PACK32;
-		let desired_format = vk::Format::R16G16B16A16_SFLOAT;
+		// let desired_format = vk::Format::R16G16B16A16_SFLOAT;
 		// let desired_format = vk::Format::R16G16B16A16_UNORM;
 
 		Surface {

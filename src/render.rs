@@ -50,16 +50,16 @@ pub fn render_func(
 		.extent(engine.surface.surface_resolution)
 		.build();
 
-	let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
-		.render_pass(engine.renderpass.renderpass)
-		.framebuffer(engine.swapchain.swapchain_framebuffers[current_image])
+	let hdr_render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+		.render_pass(engine.hdr_renderpass.renderpass)
+		.framebuffer(engine.swapchain.swapchain_hdr_framebuffers[current_image])
 		.render_area(render_area)
 		.clear_values(&clear_value)
 		.build();
 
-	let ui_render_pass_begin_info = vk::RenderPassBeginInfo::builder()
-		.render_pass(engine.ui_renderpass.renderpass)
-		.framebuffer(engine.swapchain.swapchain_ui_framebuffers[current_image])
+	let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+		.render_pass(engine.renderpass.renderpass)
+		.framebuffer(engine.swapchain.swapchain_framebuffers[current_image])
 		.render_area(render_area)
 		.clear_values(&clear_value)
 		.build();
@@ -68,7 +68,7 @@ pub fn render_func(
 	unsafe {
 		engine.device.device.cmd_begin_render_pass(
 			command_buffer,
-			&render_pass_begin_info,
+			&hdr_render_pass_begin_info,
 			vk::SubpassContents::INLINE,
 		);
 		engine.device.device.cmd_bind_pipeline(
@@ -121,7 +121,7 @@ pub fn render_func(
 
 		engine.device.device.cmd_begin_render_pass(
 			command_buffer,
-			&ui_render_pass_begin_info,
+			&render_pass_begin_info,
 			vk::SubpassContents::INLINE,
 		);
 

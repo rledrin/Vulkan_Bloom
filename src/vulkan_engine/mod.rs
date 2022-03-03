@@ -52,7 +52,6 @@ pub struct PbrParameters {
 
 pub struct VulkanEngine {
 	pub fences: fence::Fence,
-	pub ui_fence: fence::Fence,
 	pub render_finished_semaphore: semaphore::Semaphore,
 	pub image_available_semaphore: semaphore::Semaphore,
 	pub graphics_pipelines: Vec<pipeline::GraphicsPipeline>,
@@ -61,8 +60,8 @@ pub struct VulkanEngine {
 	pub descriptors: Vec<descriptor::DescriptorSet>,
 	pub command_builder: command_buffer::CommandBufferBuilder,
 	pub swapchain: swapchain::Swapchain,
+	pub hdr_renderpass: renderpass::RenderPass,
 	pub renderpass: renderpass::RenderPass,
-	pub ui_renderpass: renderpass::RenderPass,
 	pub surface: surface::Surface,
 	pub device: device::Device,
 	pub instance: instance::Instance,
@@ -228,7 +227,7 @@ impl VulkanEngine {
 		if let Some(index) = push_constant_index {
 			builder = builder.add_push_constant_16(&self.push_constants[index]);
 		}
-		builder = builder.renderpass_17(&self.renderpass, subpass_index);
+		builder = builder.renderpass_17(&self.hdr_renderpass, subpass_index);
 		let pipeline = builder.build(&self.device);
 
 		self.graphics_pipelines.push(pipeline);
@@ -242,16 +241,16 @@ impl VulkanEngine {
 		let surface = surface::Surface::new(&instance, &window, &device);
 		let mut depth_stencil_image =
 			VulkanEngine::create_depth_image(&instance, &device, &surface);
-		let renderpass = renderpass::RenderPass::builder()
+		let hdr_renderpass = renderpass::RenderPass::builder()
 			.add_attachment(
-				surface.desired_format,
+				vk::Format::R16G16B16A16_SFLOAT,
 				vk::SampleCountFlags::TYPE_1,
 				vk::AttachmentLoadOp::CLEAR,
 				vk::AttachmentStoreOp::STORE,
 				vk::AttachmentLoadOp::DONT_CARE,
 				vk::AttachmentStoreOp::DONT_CARE,
 				vk::ImageLayout::UNDEFINED,
-				vk::ImageLayout::PRESENT_SRC_KHR,
+				vk::ImageLayout::GENERAL,
 			)
 			.add_attachment(
 				depth_stencil_image.format,
@@ -290,7 +289,7 @@ impl VulkanEngine {
 			)
 			.build(&device);
 
-		let ui_renderpass = renderpass::RenderPass::builder()
+		let renderpass = renderpass::RenderPass::builder()
 			.add_attachment(
 				surface.desired_format,
 				vk::SampleCountFlags::TYPE_1,
@@ -341,12 +340,11 @@ impl VulkanEngine {
 			Some(ash::vk::PresentModeKHR::FIFO),
 			Some(
 				vk::ImageUsageFlags::COLOR_ATTACHMENT
-					| vk::ImageUsageFlags::STORAGE
-					| vk::ImageUsageFlags::SAMPLED,
+					| vk::ImageUsageFlags::STORAGE,
 			),
 			Some(depth_stencil_image),
+			&hdr_renderpass,
 			&renderpass,
-			&ui_renderpass,
 		);
 
 		let descriptors = Vec::with_capacity(1);
@@ -355,7 +353,6 @@ impl VulkanEngine {
 
 		let compute_pipelines = Vec::<pipeline::ComputePipeline>::with_capacity(1);
 
-		let ui_fence = fence::Fence::new(&device, true, 1);
 		let fences = fence::Fence::new(&device, false, swapchain.swapchain_framebuffers.len());
 
 		let render_finished_semaphore = semaphore::Semaphore::new(&device, 1);
@@ -369,15 +366,14 @@ impl VulkanEngine {
 			render_finished_semaphore,
 			image_available_semaphore,
 			fences,
-			ui_fence,
 			graphics_pipelines,
 			compute_pipelines,
 			push_constants,
 			descriptors,
 			command_builder,
 			swapchain,
+			hdr_renderpass,
 			renderpass,
-			ui_renderpass,
 			surface,
 			device,
 			instance,
@@ -398,9 +394,10 @@ impl VulkanEngine {
 				.expect("Failed to wait for the device to be idle.");
 		};
 		self.swapchain.recreate(
+			&self.device,
 			&self.surface,
+			&self.hdr_renderpass,
 			&self.renderpass,
-			&self.ui_renderpass,
 			Some(depth_image),
 		);
 		let mut pipeline_vec = Vec::with_capacity(self.graphics_pipelines.len());

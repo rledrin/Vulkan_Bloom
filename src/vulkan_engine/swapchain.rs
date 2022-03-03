@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use ash::extensions::khr;
 use ash::vk;
+use gpu_alloc::UsageFlags;
 
 use super::device::Device;
-use super::image::{self, Image};
+use super::image::Image;
 use super::instance::Instance;
-use super::renderpass::{self, RenderPass};
-use super::surface::{self, Surface};
+use super::renderpass::RenderPass;
+use super::surface::Surface;
 
 pub struct Swapchain {
 	pub swapchain_loader: khr::Swapchain,
@@ -15,10 +16,11 @@ pub struct Swapchain {
 	pub swapchain_extent: vk::Extent2D,
 	pub swapchain_images: Vec<vk::Image>,
 	pub swapchain_image_views: Vec<vk::ImageView>,
+	pub swapchain_hdr_images: Vec<Image>,
 	pub swapchain_image_sampler: vk::Sampler,
 	pub depth_stencil_image: Option<Image>,
+	pub swapchain_hdr_framebuffers: Vec<vk::Framebuffer>,
 	pub swapchain_framebuffers: Vec<vk::Framebuffer>,
-	pub swapchain_ui_framebuffers: Vec<vk::Framebuffer>,
 	pub max_image_in_flight: usize,
 	swapchain_create_info: vk::SwapchainCreateInfoKHR,
 	device: Arc<ash::Device>,
@@ -33,9 +35,9 @@ impl Drop for Swapchain {
 				self.device
 					.destroy_image_view(self.swapchain_image_views[i], None);
 				self.device
-					.destroy_framebuffer(self.swapchain_framebuffers[i], None);
+					.destroy_framebuffer(self.swapchain_hdr_framebuffers[i], None);
 				self.device
-					.destroy_framebuffer(self.swapchain_ui_framebuffers[i], None);
+					.destroy_framebuffer(self.swapchain_framebuffers[i], None);
 			}
 			self.swapchain_loader
 				.destroy_swapchain(self.swapchain, None);
@@ -61,8 +63,8 @@ impl Swapchain {
 		present_mode: Option<vk::PresentModeKHR>,
 		image_usage: Option<vk::ImageUsageFlags>,
 		depth_stencil_image: Option<Image>,
+		hdr_renderpass: &RenderPass,
 		renderpass: &RenderPass,
-		ui_renderpass: &RenderPass,
 	) -> Swapchain {
 		let present_modes = unsafe {
 			surface
@@ -84,7 +86,6 @@ impl Swapchain {
 		// 	surface.desired_format, surface.surface_format.color_space
 		// );
 
-		// let format = surface.surface_format.format;
 		let format = surface.desired_format;
 
 		let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
@@ -114,12 +115,15 @@ impl Swapchain {
 				.expect("Failed to get Swapchain Images.")
 		};
 
-		let mut attachments = Vec::with_capacity(2);
+		let swapchain_hdr_images =
+			Swapchain::create_hdr_images(device, surface, swapchain_images.len());
+
+		let mut hdr_attachments = Vec::with_capacity(2);
 		if depth_stencil_image.is_some() {
-			attachments.resize(2, Default::default());
-			attachments[1] = depth_stencil_image.as_ref().unwrap().image_view;
+			hdr_attachments.resize(2, Default::default());
+			hdr_attachments[1] = depth_stencil_image.as_ref().unwrap().image_view;
 		} else {
-			attachments.resize(1, Default::default());
+			hdr_attachments.resize(1, Default::default());
 		}
 
 		let sampler_create_info = vk::SamplerCreateInfo::builder()
@@ -148,9 +152,26 @@ impl Swapchain {
 		};
 
 		let mut swapchain_image_views = Vec::with_capacity(swapchain_images.len());
+		let mut swapchain_hdr_framebuffers = Vec::with_capacity(swapchain_images.len());
 		let mut swapchain_framebuffers = Vec::with_capacity(swapchain_images.len());
-		let mut swapchain_ui_framebuffers = Vec::with_capacity(swapchain_images.len());
-		for &image in swapchain_images.iter() {
+		for i in 0..swapchain_images.len() {
+			hdr_attachments[0] = swapchain_hdr_images[i].image_view;
+			let hdr_framebuffer_create_info = vk::FramebufferCreateInfo::builder()
+				.flags(vk::FramebufferCreateFlags::empty())
+				.render_pass(hdr_renderpass.renderpass)
+				.attachments(&hdr_attachments)
+				.width(surface.surface_resolution.width)
+				.height(surface.surface_resolution.height)
+				.layers(1)
+				.build();
+
+			let hdr_framebuffer = unsafe {
+				device
+					.device
+					.create_framebuffer(&hdr_framebuffer_create_info, None)
+					.expect("Failed to create a framebuffer.")
+			};
+
 			let image_view_create_info = vk::ImageViewCreateInfo::builder()
 				.view_type(vk::ImageViewType::TYPE_2D)
 				.format(format)
@@ -171,7 +192,7 @@ impl Swapchain {
 						.layer_count(1)
 						.build(),
 				)
-				.image(image)
+				.image(swapchain_images[i])
 				.build();
 			let imageview = unsafe {
 				device
@@ -179,19 +200,10 @@ impl Swapchain {
 					.create_image_view(&image_view_create_info, None)
 					.expect("Failed to create Image View!")
 			};
-			attachments[0] = imageview;
+
 			let framebuffer_create_info = vk::FramebufferCreateInfo::builder()
 				.flags(vk::FramebufferCreateFlags::empty())
 				.render_pass(renderpass.renderpass)
-				.attachments(&attachments)
-				.width(surface.surface_resolution.width)
-				.height(surface.surface_resolution.height)
-				.layers(1)
-				.build();
-
-			let ui_framebuffer_create_info = vk::FramebufferCreateInfo::builder()
-				.flags(vk::FramebufferCreateFlags::empty())
-				.render_pass(ui_renderpass.renderpass)
 				.attachments(&[imageview])
 				.width(surface.surface_resolution.width)
 				.height(surface.surface_resolution.height)
@@ -204,16 +216,9 @@ impl Swapchain {
 					.create_framebuffer(&framebuffer_create_info, None)
 					.expect("Failed to create a framebuffer.")
 			};
-
-			let ui_framebuffer = unsafe {
-				device
-					.device
-					.create_framebuffer(&ui_framebuffer_create_info, None)
-					.expect("Failed to create a framebuffer.")
-			};
 			swapchain_image_views.push(imageview);
+			swapchain_hdr_framebuffers.push(hdr_framebuffer);
 			swapchain_framebuffers.push(framebuffer);
-			swapchain_ui_framebuffers.push(ui_framebuffer);
 		}
 
 		let swapchain_extent = surface.surface_resolution;
@@ -228,20 +233,54 @@ impl Swapchain {
 			swapchain_image_views,
 			swapchain_image_sampler,
 			depth_stencil_image,
+			swapchain_hdr_framebuffers,
+			swapchain_hdr_images,
 			swapchain_framebuffers,
-			swapchain_ui_framebuffers,
 			max_image_in_flight,
 			swapchain_create_info,
 			device: device.device.clone(),
 		}
 	}
 
+	fn create_hdr_images(device: &Device, surface: &Surface, number: usize) -> Vec<Image> {
+		let mut images = Vec::with_capacity(number);
+		let extent = vk::Extent3D::builder()
+			.width(surface.surface_resolution.width)
+			.height(surface.surface_resolution.height)
+			.depth(1)
+			.build();
+		for _ in 0..number {
+			let im = Image::new(
+				device,
+				vk::ImageCreateFlags::empty(),
+				vk::ImageType::TYPE_2D,
+				vk::Format::R16G16B16A16_SFLOAT,
+				extent,
+				1,
+				1,
+				vk::ImageTiling::OPTIMAL,
+				vk::ImageUsageFlags::COLOR_ATTACHMENT
+					| vk::ImageUsageFlags::STORAGE
+					| vk::ImageUsageFlags::SAMPLED,
+				device.queue_family_index,
+				vk::ImageLayout::UNDEFINED,
+				vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+				vk::ImageViewType::TYPE_2D,
+				vk::ImageAspectFlags::COLOR,
+				UsageFlags::FAST_DEVICE_ACCESS,
+			);
+			images.push(im);
+		}
+		images
+	}
+
 	pub fn recreate(
 		&mut self,
-		surface: &surface::Surface,
-		renderpass: &renderpass::RenderPass,
-		ui_renderpass: &renderpass::RenderPass,
-		depth_image: Option<image::Image>,
+		device: &Device,
+		surface: &Surface,
+		hdr_renderpass: &RenderPass,
+		renderpass: &RenderPass,
+		depth_image: Option<Image>,
 	) {
 		unsafe {
 			self.device
@@ -251,15 +290,17 @@ impl Swapchain {
 				self.device
 					.destroy_image_view(self.swapchain_image_views[i], None);
 				self.device
-					.destroy_framebuffer(self.swapchain_framebuffers[i], None);
+					.destroy_framebuffer(self.swapchain_hdr_framebuffers[i], None);
 				self.device
-					.destroy_framebuffer(self.swapchain_ui_framebuffers[i], None);
+					.destroy_framebuffer(self.swapchain_framebuffers[i], None);
+				// drop(self.swapchain_hdr_images[i]);
 			}
 			self.swapchain_loader
 				.destroy_swapchain(self.swapchain, None);
 		}
+		self.swapchain_hdr_images.clear();
+		self.swapchain_hdr_framebuffers.clear();
 		self.swapchain_framebuffers.clear();
-		self.swapchain_ui_framebuffers.clear();
 		self.swapchain_image_views.clear();
 
 		self.swapchain_create_info.image_extent = surface.surface_resolution;
@@ -274,6 +315,9 @@ impl Swapchain {
 				.get_swapchain_images(self.swapchain)
 				.expect("Failed to get Swapchain Images.")
 		};
+
+		self.swapchain_hdr_images =
+			Swapchain::create_hdr_images(device, surface, self.swapchain_images.len());
 
 		let sampler_create_info = vk::SamplerCreateInfo::builder()
 			.min_filter(vk::Filter::LINEAR)
@@ -299,17 +343,17 @@ impl Swapchain {
 				.expect("Failed to create an image sampler(swapchain).")
 		};
 
-		let mut attachments = Vec::with_capacity(2);
+		let mut hdr_attachments = Vec::with_capacity(2);
 		if self.depth_stencil_image.is_some() {
 			drop(self.depth_stencil_image.as_ref().unwrap());
 			self.depth_stencil_image = depth_image;
-			attachments.resize(2, Default::default());
-			attachments[1] = self.depth_stencil_image.as_ref().unwrap().image_view;
+			hdr_attachments.resize(2, Default::default());
+			hdr_attachments[1] = self.depth_stencil_image.as_ref().unwrap().image_view;
 		} else {
-			attachments.resize(1, Default::default());
+			hdr_attachments.resize(1, Default::default());
 		}
 
-		for (_, image) in self.swapchain_images.iter().enumerate() {
+		for i in 0..self.swapchain_images.len() {
 			let image_view_create_info = vk::ImageViewCreateInfo::builder()
 				.view_type(vk::ImageViewType::TYPE_2D)
 				.format(self.swapchain_create_info.image_format)
@@ -330,7 +374,7 @@ impl Swapchain {
 						.layer_count(1)
 						.build(),
 				)
-				.image(*image)
+				.image(self.swapchain_images[i])
 				.build();
 			let imageview = unsafe {
 				self.device
@@ -338,38 +382,38 @@ impl Swapchain {
 					.expect("Failed to create Image View!")
 			};
 
-			attachments[0] = imageview;
-			let framebuffer_create_info = vk::FramebufferCreateInfo::builder()
+			hdr_attachments[0] = self.swapchain_hdr_images[i].image_view;
+			let hdr_framebuffer_create_info = vk::FramebufferCreateInfo::builder()
 				.flags(vk::FramebufferCreateFlags::empty())
-				.render_pass(renderpass.renderpass)
-				.attachments(&attachments)
+				.render_pass(hdr_renderpass.renderpass)
+				.attachments(&hdr_attachments)
 				.width(surface.surface_resolution.width)
 				.height(surface.surface_resolution.height)
 				.layers(1)
 				.build();
 
-			let ui_framebuffer_create_info = vk::FramebufferCreateInfo::builder()
+			let framebuffer_create_info = vk::FramebufferCreateInfo::builder()
 				.flags(vk::FramebufferCreateFlags::empty())
-				.render_pass(ui_renderpass.renderpass)
+				.render_pass(renderpass.renderpass)
 				.attachments(&[imageview])
 				.width(surface.surface_resolution.width)
 				.height(surface.surface_resolution.height)
 				.layers(1)
 				.build();
 
+			let hdr_framebuffer = unsafe {
+				self.device
+					.create_framebuffer(&hdr_framebuffer_create_info, None)
+					.expect("Failed to create a framebuffer.")
+			};
 			let framebuffer = unsafe {
 				self.device
 					.create_framebuffer(&framebuffer_create_info, None)
 					.expect("Failed to create a framebuffer.")
 			};
-			let ui_framebuffer = unsafe {
-				self.device
-					.create_framebuffer(&ui_framebuffer_create_info, None)
-					.expect("Failed to create a framebuffer.")
-			};
 			self.swapchain_image_views.push(imageview);
+			self.swapchain_hdr_framebuffers.push(hdr_framebuffer);
 			self.swapchain_framebuffers.push(framebuffer);
-			self.swapchain_ui_framebuffers.push(ui_framebuffer);
 		}
 		self.swapchain_extent = surface.surface_resolution;
 	}

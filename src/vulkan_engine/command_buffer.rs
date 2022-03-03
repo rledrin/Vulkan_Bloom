@@ -179,42 +179,4 @@ impl CommandBufferBuilder {
 
 		command_buffer[0]
 	}
-
-	pub fn submit_command_buffer(
-		&self,
-		device: &super::device::Device,
-		command_buffer: vk::CommandBuffer,
-		ui_fence: &super::fence::Fence,
-	) {
-		let mut submit_info = vk::SubmitInfo::builder()
-			.command_buffers(&[command_buffer])
-			// .wait_semaphores(&[])
-			// .signal_semaphores(&[])
-			.wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
-			.build();
-		submit_info.wait_semaphore_count = 0;
-
-		unsafe {
-			device
-				.device
-				.end_command_buffer(command_buffer)
-				.expect("Failed to end a command buffer.");
-
-			device
-				.device
-				.reset_fences(&ui_fence.fences)
-				.expect("Failed to reset fences.");
-			device
-				.device
-				.queue_submit(device.graphic_queue, &[submit_info], ui_fence.fences[0])
-				.expect("Failed  to submit a command buffer");
-			device
-				.device
-				.wait_for_fences(&ui_fence.fences, true, std::u64::MAX)
-				.expect("Failed to wait for the ui fence.");
-			device
-				.device
-				.free_command_buffers(self.command_pool.command_pool, &[command_buffer]);
-		};
-	}
 }
