@@ -12,5 +12,5 @@
 ### Ressources
  * https://learnopengl.com/PBR/Theory
  * https://www.youtube.com/watch?v=tI70-HIc5ro
- * https://www.youtube.com/watch?v=kQc2BUjORhs
+ * https://youtu.be/kQc2BUjORhs?t=2576
  * https://www.reddit.com/r/vulkan/
