@@ -1,5 +1,5 @@
 # Vulkan_Bloom
-![bloom](https://user-images.githubusercontent.com/66097877/156460896-bc79e3f4-86c3-4703-855e-f4c71eb7f2d6.PNG)
+![bloom](https://user-images.githubusercontent.com/66097877/156609393-9f6a9a90-edf5-454d-a54d-328418f2b130.PNG)
 
 ## How to compile/run
  * [Install the rust compiler and cargo](https://www.rust-lang.org/learn/get-started)
