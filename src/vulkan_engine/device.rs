@@ -252,14 +252,18 @@ impl Device {
 				.create_device(physical_device, &device_create_info, None)
 				.expect("Failed to create the logical Device!")
 		};
+		let queue_family_props = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
+		let queue_family_props = queue_family_props[family_index as usize];
 
 		let (graphic_queue, compute_queue, transfer_queue, present_queue) = unsafe {
-			let graphic = device.get_device_queue(family_index, 0);
-			let compute = device.get_device_queue(family_index, 1);
-			let transfer = device.get_device_queue(family_index, 2);
-			let present = device.get_device_queue(family_index, 3);
+			let graphic = device.get_device_queue(family_index, std::cmp::min(0, queue_family_props.queue_count));
+			let compute = device.get_device_queue(family_index, std::cmp::min(1, queue_family_props.queue_count));
+			let transfer = device.get_device_queue(family_index, std::cmp::min(2, queue_family_props.queue_count));
+			let present = device.get_device_queue(family_index, std::cmp::min(3, queue_family_props.queue_count));
 			(graphic, compute, transfer, present)
 		};
+
+
 
 		(
 			device,
