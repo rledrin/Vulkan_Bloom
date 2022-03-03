@@ -207,7 +207,11 @@ impl Device {
 			.family_index
 			.expect("No queue family index.");
 
-		let queue_priorities = [1.0f32, 1.0f32, 1.0f32, 1.0f32];
+		let queue_family_props = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
+		let queue_family_props = queue_family_props[family_index as usize];
+
+		let mut queue_priorities = Vec::with_capacity(4);
+		queue_priorities.resize(std::cmp::min(4, queue_family_props.queue_count as usize), 1.0);
 
 		let queue_info = [vk::DeviceQueueCreateInfo::builder()
 			.queue_family_index(family_index)
@@ -252,8 +256,6 @@ impl Device {
 				.create_device(physical_device, &device_create_info, None)
 				.expect("Failed to create the logical Device!")
 		};
-		let queue_family_props = unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
-		let queue_family_props = queue_family_props[family_index as usize];
 
 		let (graphic_queue, compute_queue, transfer_queue, present_queue) = unsafe {
 			let graphic = device.get_device_queue(family_index, std::cmp::min(0, queue_family_props.queue_count));
